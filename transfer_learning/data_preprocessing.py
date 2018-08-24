@@ -8,9 +8,9 @@ import tensorflow as tf
 from tensorflow.python.platform import gfile
 
 # input data folder
-INPUT_DATA = '/Users/haiyong/Downloads/flower_photos'
+INPUT_DATA = '/home/harvey/flower_photos'
 # output file
-OUTPUT_FILE = '/Users/haiyong/Downloads/flower_photos/flower_processed_data.npy'
+OUTPUT_FILE = '/home/harvey/flower_photos/flower_processed_data.npy'
 
 # percentage of validation and test data
 VALIDATION_PERCENTAGE = 10
