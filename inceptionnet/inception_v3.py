@@ -1,7 +1,13 @@
+import time
+from datetime import datetime
 import tensorflow as tf
 slim = tf.contrib.slim
 # generate truncated normal
 trunc_normal = lambda stddev : tf.truncated_normal_initializer(0.0, stddev)
+batch_size = 32
+num_batches = 100
+height, width = 299, 299
+num_steps_burn_in = 10
 
 def inception_v3_avg_scope(weight_decay=0.00004, stddev=0.1, batch_norm_var_collection='moving_vars'):
     # generate default parameters used in functions
@@ -41,7 +47,7 @@ def inception_v3_base(inputs, scope=None):
             net = slim.conv2d(net, 192, [3, 3], scope='Conv2d_4a_3x3')
             net = slim.max_pool2d(net, [3, 3], stride=2, scope='MaxPool_5a_3x3')
         # inception module
-        with tf.arg_scope([slim.conv2d, slim.max_pool2d, slim.avg_pool2d], stride=1, padding='SAME'):
+        with slim.arg_scope([slim.conv2d, slim.max_pool2d, slim.avg_pool2d], stride=1, padding='SAME'):
             with tf.variable_scope('Mixed_5b'):
                 with tf.variable_scope('Branch_0'):
                     branch_0 = slim.conv2d(net, 64, [1, 1], scope='Conv2d_0a_1x1')
@@ -181,7 +187,7 @@ def inception_v3_base(inputs, scope=None):
                     branch_1 = slim.conv2d(branch_1, 192, [7, 1], scope='Conv2d_0c_7x1')
                     branch_1 = slim.conv2d(branch_1, 192, [3, 3], stride=2, padding='VALID', scope='Conv2d_0d_3x3')
                 with tf.variable_scope('Branch_2'):
-                    brancn_2 = slim.max_pool2d(net, [3, 3], stride=2, padding='VALID', scope='MaxPool_0a_3x3')
+                    branch_2 = slim.max_pool2d(net, [3, 3], stride=2, padding='VALID', scope='MaxPool_0a_3x3')
                 net = tf.concat([branch_0, branch_1, branch_2], 3)
 
             with tf.variable_scope('Mixed_7b'):
@@ -225,7 +231,7 @@ def inception_v3_base(inputs, scope=None):
 
 # pool, softmax, auxiliary of inception-v3
 def inception_v3(inputs,
-                 num_classed=1000,
+                 num_classes=1000,
                  is_training=True,
                  dropout_keep_prob=0.8,
                  prediction_fn=slim.softmax,
@@ -260,38 +266,37 @@ def inception_v3(inputs,
                     end_points['Predictions'] = prediction_fn(logits, scope='Predictions')
             return logits, end_points
 
-# evaluate time of vggnet-16
-def time_tensorflow_run(session, target, feed, info_string):
+# evaluate time of every iteration
+def time_tensorflow_run(session, target, info_string):
     num_steps_burn_in = 10
     total_duration = 0.0
     total_duration_squared = 0.0
-    for i in range(num_batches+num_steps_burn_in):
+    for i in range(num_batches + num_steps_burn_in):
         start_time = time.time()
-        _ = session.run(target, feed_dict=feed)
+        _ = session.run(target)
         duration = time.time() - start_time
         if i > num_steps_burn_in:
             if not i % 10:
-                print('%s: step %d, duration = %.3f' % (datetime.now(), i - num_steps_burn_in, duration))
+                print('%s, step: %d, duration = %.3f' % (datetime.now(), i - num_steps_burn_in, duration))
             total_duration += duration
             total_duration_squared += duration * duration
     mn = total_duration / num_batches
-    vr = total_duration_squared / num_batches - mn * mn
+    vr = total_duration_squared / num_batches - mn*mn
     sd = math.sqrt(vr)
-    print ('%s: %s across %d steps, %.3f +/- %.3f sec / batch' % (datetime.now(), info_string, num_batches, mn, sd))
+    print('%s, %s across %d steps, %.3f +/- %.3f sec / batch' % (datetime.now(), info_string, num_batches, mn, sd))
 
 # main function
 def run_benchmark():
-    batch_size = 32
-    num_batches = 100
-    height, width = 299, 299
-    inputs = tf.random_uniform((batch_size, heigth, width, 3))
-    with slim.arg_scope(inception_v3_arg_scope()):
+    inputs = tf.random_uniform((batch_size, height, width, 3))
+    with slim.arg_scope(inception_v3_avg_scope()):
         logits, end_points = inception_v3(inputs, is_training=False)
 
     init = tf.global_variables_initializer()
     sess = tf.Session()
     sess.run(init)
+    print 'begin test---------'
     time_tensorflow_run(sess, logits, 'Forward')
 
-run_benchmark
+if __name__ == '__main__':
+    run_benchmark()
 
